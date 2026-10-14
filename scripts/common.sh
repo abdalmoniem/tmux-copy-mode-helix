@@ -21,3 +21,10 @@ cmh_begin_if_normal() {
     tmux send-keys -t "$pane" -X begin-selection
   fi
 }
+
+cmh_restore_status() {
+  local prev
+  prev="$(tmux show-option -gv @cmh_prev_status 2>/dev/null || printf on)"
+  tmux set-option -g status "$prev" >/dev/null 2>&1
+  tmux set-option -gu @cmh_prev_status >/dev/null 2>&1
+}

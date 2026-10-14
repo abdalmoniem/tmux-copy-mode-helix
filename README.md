@@ -9,17 +9,9 @@ then yank with `y` or `Enter`.
 
 ```tmux
 set -g @plugin 'tmux-plugins/tpm'
-
-# Install into /home/abel/projects/copy-mode-helix or use your TPM location:
-set -g @plugin '/home/abel/projects/copy-mode-helix'
+set -g @plugin 'abdalmoniem/tmux-copy-mode-helix'
 
 run '~/.tmux/plugins/tpm/tpm'
-```
-
-## Manual installation
-
-```tmux
-run-shell /home/abel/projects/copy-mode-helix/copy-mode-helix.tmux
 ```
 
 ## Usage
@@ -65,6 +57,15 @@ Helix `g`, `m`, `z`, `[`, `]` open a one-key sub-prompt to emulate minor modes.
 | `o` | other selection end |
 | `r` | refresh pane |
 | `:` | goto line |
+
+## Configuration
+
+Options (set before `run-shell` / TPM):
+
+- `@copy-mode-helix-clipboard` – override the clipboard command used for `y`/`Enter`
+  (default: auto-detect `wl-copy`, `xclip`, `xsel`, or `pbcopy`)
+- `@copy-mode-helix-position-indicator` – `on` (default) or `off`; controls whether
+  `SEL`/`NOR` is shown in the top-right copy-mode position indicator.
 
 ## Notes / limitations
 
