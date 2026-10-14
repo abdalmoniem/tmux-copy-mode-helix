@@ -237,8 +237,10 @@ case "$key" in
     tmux set-option -p -t "$pane" @cmh_x_origin '' >/dev/null 2>&1
     tmux set-option -p -t "$pane" @cmh_x_count '' >/dev/null 2>&1
     mode_now="$(cmh_mode_get "$pane")"
-    if [[ "$mode_now" == "extend" ]]; then
-      # Collapse to normal mode without leaving copy mode.
+    sel_active="$(tmux display-message -p -t "$pane" '#{selection_active}' 2>/dev/null || printf 0)"
+    if [[ "$mode_now" == "extend" || "$sel_active" == "1" ]]; then
+      # Exit selection/SEL mode, returning to normal (NOR) mode while
+      # staying in tmux copy mode instead of cancelling the whole session.
       tmux set-option -p -t "$pane" @cmh_mode normal >/dev/null 2>&1
       m='normal'
       tmux send-keys -t "$pane" -X other-end

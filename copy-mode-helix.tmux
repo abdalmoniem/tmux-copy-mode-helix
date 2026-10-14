@@ -89,6 +89,3 @@ k ')' rightbrace
 
 # find-char keys are dispatched through keys.sh too
 k f f; k t t; k F F; k T T
-chmod +x /home/abel/projects/copy-mode-helix/copy-mode-helix.tmux
-# syntax check
-bash -n /home/abel/projects/copy-mode-helix/copy-mode-helix.tmux # && echo "syntax ok"
