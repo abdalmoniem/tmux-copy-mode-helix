@@ -6,12 +6,6 @@ pane="${2:-}"
 [ -z "$pane" ] && exit 0
 . "${0%/*}/common.sh"
 
-# reset repeated-x state unless this key reuses it
-if [[ "$key" != "x" && "$key" != "X" && "$key" != "V" ]]; then
-  tmux set-option -p -t "$pane" @cmh_x_origin '' >/dev/null 2>&1
-  tmux set-option -p -t "$pane" @cmh_x_count '' >/dev/null 2>&1
-fi
-
 pending="$(tmux show-option -pv -t "$pane" @cmh_pending 2>/dev/null || printf '')"
 m="$(cmh_mode_get "$pane")"
 
@@ -134,8 +128,6 @@ case "$key" in
   r) tmux send-keys -t "$pane" -X refresh-from-pane ;;
 
   v|space)
-    tmux set-option -p -t "$pane" @cmh_x_origin '' >/dev/null 2>&1
-    tmux set-option -p -t "$pane" @cmh_x_count '' >/dev/null 2>&1
     if [[ "$m" == "extend" ]]; then
       tmux set-option -p -t "$pane" @cmh_mode normal >/dev/null 2>&1
       m='normal'
@@ -153,36 +145,17 @@ case "$key" in
     fi
     ;;
   x|X|V)
-    # Reset x-state on any non-x key is handled before dispatch; here extend by
-    # line on repeated press, matching helix 'x'.
-    cur_origin="$(tmux show-option -pv -t "$pane" @cmh_x_origin 2>/dev/null || true)"
-    cur_count="$(tmux show-option -pv -t "$pane" @cmh_x_count 2>/dev/null || true)"
-    if [[ -z "$cur_origin" || "$cur_count" == "" ]]; then
-      cur_origin="$(tmux display -p -t "$pane" '#{cursor_y}')"
-      tmux send-keys -t "$pane" -X start-of-line
-      tmux send-keys -t "$pane" -X begin-selection
+    # helix 'x': select the current line; if a selection is already active,
+    # extend it down by one line instead of re-anchoring (never wipe it).
+    if [[ "$(tmux display -p -t "$pane" '#{selection_active}' 2>/dev/null || printf 0)" == "1" ]]; then
       tmux send-keys -t "$pane" -X end-of-line
-      cur_count=1
-    else
-      # extend to the next line below by rebuilding the selection
-      move_up=$((cur_count - 1))
-      if [[ $move_up -gt 0 ]]; then
-        tmux send-keys -t "$pane" -X -N "$move_up" cursor-up
-      fi
-      tmux send-keys -t "$pane" -X clear-selection
-      tmux send-keys -t "$pane" -X start-of-line
-      tmux send-keys -t "$pane" -X begin-selection
-      if [[ $cur_count -gt 1 ]]; then
-        tmux send-keys -t "$pane" -X -N "$((cur_count - 1))" cursor-down
-      fi
       tmux send-keys -t "$pane" -X cursor-down
       tmux send-keys -t "$pane" -X end-of-line
-      cur_count=$((cur_count + 1))
+    else
+      tmux send-keys -t "$pane" -X start-of-line
+      tmux send-keys -t "$pane" -X begin-selection
+      tmux send-keys -t "$pane" -X end-of-line
     fi
-    tmux set-option -p -t "$pane" @cmh_x_origin "$cur_origin" >/dev/null 2>&1
-    tmux set-option -p -t "$pane" @cmh_x_count "$cur_count" >/dev/null 2>&1
-    tmux set-option -p -t "$pane" @cmh_mode normal >/dev/null 2>&1
-    m='normal'
     ;;
 
   percent)
@@ -234,8 +207,6 @@ case "$key" in
     tmux command-prompt -p "(goto line)" "send-keys -X goto-line -- '%%'" ;;
 
   q|Escape)
-    tmux set-option -p -t "$pane" @cmh_x_origin '' >/dev/null 2>&1
-    tmux set-option -p -t "$pane" @cmh_x_count '' >/dev/null 2>&1
     mode_now="$(cmh_mode_get "$pane")"
     sel_active="$(tmux display-message -p -t "$pane" '#{selection_active}' 2>/dev/null || printf 0)"
     if [[ "$mode_now" == "extend" || "$sel_active" == "1" ]]; then
