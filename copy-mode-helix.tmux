@@ -26,19 +26,21 @@ tmux set-window-option -g mode-keys vi >/dev/null 2>&1
 indicator="$(tmux show-option -gv @copy-mode-helix-position-indicator 2>/dev/null || printf on)"
 if [[ "$indicator" != "off" ]]; then
   tmux set-option -g copy-mode-position-format \
-    "#[align=right]#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}[#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{search_count}#{?search_count_partial,+,} results),}} #[bold]#{?#{==:#{@cmh_mode},extend},SEL,NOR}#[nobold]" >/dev/null 2>&1
+    "#[align=right]#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}[#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{?@cmh_search_index,#{@cmh_search_index} / ,}#{search_count}#{?search_count_partial,+,} results),}} #[bold]#{?#{==:#{@cmh_mode},extend},SEL,NOR}#[nobold]" >/dev/null 2>&1
 else
   tmux set-option -g copy-mode-position-format \
-    "#[align=right]#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}[#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{search_count}#{?search_count_partial,+,} results),}}" >/dev/null 2>&1
+    "#[align=right]#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}[#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{?@cmh_search_index,#{@cmh_search_index} / ,}#{search_count}#{?search_count_partial,+,} results),}}" >/dev/null 2>&1
 fi
 
 # --- enter copy mode ---------------------------------------------------------
-tmux bind-key [ run-shell -b "$SCRIPTS/enter-copy-mode.sh '#{pane_id}'"
+tmux bind-key [ run-shell "$SCRIPTS/enter-copy-mode.sh '#{pane_id}'"
 
 # helper: bind a copy-mode key to the unified dispatcher
 k() {
   # $1 = tmux key spec, $2 = dispatcher token
-  tmux bind-key -T copy-mode-vi "$1" run-shell -b "$SCRIPTS/keys.sh '$2' '#{pane_id}'"
+  # Synchronous: stateful handlers must observe keys in the order they were
+  # pressed. run-shell -b lets fast repeats race (e.g. x x, g c, x ; e).
+  tmux bind-key -T copy-mode-vi "$1" run-shell "$SCRIPTS/keys.sh '$2' '#{pane_id}'"
 }
 
 # movement
@@ -65,6 +67,10 @@ k NPage NPage; k PPage PPage
 k g g; k z z; k m m
 k '[' lbracket; k ']' rbracket
 
+# Prefix-only second keys. They must be bound to the dispatcher or tmux
+# handles them directly and the pending g/z/[/] prefix never sees them.
+k c c; k s s; k u u; k d d; k p p
+
 # selection
 k v v; k Space space
 k x x; k X X; k V V
@@ -72,7 +78,6 @@ k '%' percent
 k o o
 k ',' comma
 k '\;' semicolon
-k '%' percent
 
 # search & misc
 k n n; k N N
@@ -82,7 +87,6 @@ k '/' slash; k '?' question
 k ':' colon
 
 # misc
-k o o
 k y y; k Enter Enter; k Y Y
 k q q; k Escape Escape
 k ')' rightbrace
