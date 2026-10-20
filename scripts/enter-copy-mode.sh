@@ -10,4 +10,5 @@ tmux set-option -p -t "$pane" @cmh_mode normal \; \
      set-option -p -t "$pane" @cmh_search_pos '' \; \
      set-option -p -t "$pane" @cmh_search_pattern '' \; \
      set-option -p -t "$pane" @cmh_search_regex '' \; \
-     set-option -p -t "$pane" @cmh_search_dir '' >/dev/null 2>&1
+     set-option -p -t "$pane" @cmh_search_dir '' \; \
+     set-option -p -t "$pane" @cmh_goal_col '' >/dev/null 2>&1

@@ -26,10 +26,10 @@ tmux set-window-option -g mode-keys vi >/dev/null 2>&1
 indicator="$(tmux show-option -gv @copy-mode-helix-position-indicator 2>/dev/null || printf on)"
 if [[ "$indicator" != "off" ]]; then
   tmux set-option -g copy-mode-position-format \
-    "#[align=right]#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}[#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{?@cmh_search_index,#{@cmh_search_index} / ,}#{search_count}#{?search_count_partial,+,} results),}} #[bold]#{?#{==:#{@cmh_mode},extend},SEL,NOR}#[nobold]" >/dev/null 2>&1
+    "#[align=right](#{e|+|:#{e|-|:#{e|+|:#{history_size},#{copy_cursor_y}},#{scroll_position}},1}:#{e|+|:#{copy_cursor_x},1}) [#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{?@cmh_search_index,#{@cmh_search_index} / ,}#{search_count}#{?search_count_partial,+,} results),}} #[bold]#{?#{==:#{@cmh_mode},extend},SEL,NOR}#[nobold]" >/dev/null 2>&1
 else
   tmux set-option -g copy-mode-position-format \
-    "#[align=right]#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}[#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{?@cmh_search_index,#{@cmh_search_index} / ,}#{search_count}#{?search_count_partial,+,} results),}}" >/dev/null 2>&1
+    "#[align=right](#{e|+|:#{e|-|:#{e|+|:#{history_size},#{copy_cursor_y}},#{scroll_position}},1}:#{e|+|:#{copy_cursor_x},1}) [#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{?@cmh_search_index,#{@cmh_search_index} / ,}#{search_count}#{?search_count_partial,+,} results),}}" >/dev/null 2>&1
 fi
 
 # --- enter copy mode ---------------------------------------------------------

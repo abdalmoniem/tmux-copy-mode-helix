@@ -6,13 +6,37 @@ pane="${2:-}"
 [ -z "$pane" ] && exit 0
 . "${0%/*}/common.sh"
 
-# Read pending/mode/x/search state and the cursor in one tmux call. '|'
-# preserves empty fields.
-IFS='|' read -r pending m xsel sindex spos sdir hsize oy cy cx < <(tmux display -p -t "$pane" \
-  '#{@cmh_pending}|#{@cmh_mode}|#{@cmh_x_sel}|#{@cmh_search_index}|#{@cmh_search_pos}|#{@cmh_search_dir}|#{history_size}|#{scroll_position}|#{copy_cursor_y}|#{copy_cursor_x}' \
+# Read pending/mode/x/search state, the vertical goal column and the cursor in
+# one tmux call. '|' preserves empty fields.
+IFS='|' read -r pending m xsel sindex spos sdir goal_opt hsize oy cy cx < <(tmux display -p -t "$pane" \
+  '#{@cmh_pending}|#{@cmh_mode}|#{@cmh_x_sel}|#{@cmh_search_index}|#{@cmh_search_pos}|#{@cmh_search_dir}|#{@cmh_goal_col}|#{history_size}|#{scroll_position}|#{copy_cursor_y}|#{copy_cursor_x}' \
   2>/dev/null)
 m="${m:-normal}"
 hsize="${hsize:-0}"; oy="${oy:-0}"; cy="${cy:-0}"; cx="${cx:-0}"
+
+cmh_search_set() {
+  tmux set-option -p -t "$pane" @cmh_search_index "${1:-}" \; \
+       set-option -p -t "$pane" @cmh_search_pos "${2:-}" >/dev/null 2>&1
+}
+
+# The indicator is drawn on the pane's top line, and cursor motions only
+# repaint the lines they touch, so repaint after every key. toggle-position is
+# CLEAR_NEVER (search marks survive) and toggling twice leaves visibility as
+# it was. The vertical goal column only survives consecutive j/k moves.
+cmh_keep_goal=0
+cmh_goal_value=''
+cmh_redraw() {
+  if [[ "$cmh_keep_goal" == "1" ]]; then
+    tmux set-option -p -t "$pane" @cmh_goal_col "$cmh_goal_value" \; \
+         send-keys -t "$pane" -X toggle-position \; \
+         send-keys -t "$pane" -X toggle-position >/dev/null 2>&1
+  else
+    tmux set-option -p -t "$pane" @cmh_goal_col '' \; \
+         send-keys -t "$pane" -X toggle-position \; \
+         send-keys -t "$pane" -X toggle-position >/dev/null 2>&1
+  fi
+}
+trap cmh_redraw EXIT
 
 # Only x/X/V and keys that leave the selection untouched may reuse the
 # x-owned selection state; everything else starts a fresh x range.
@@ -25,7 +49,7 @@ esac
 # navigation moves off it, so drop the index (the total stays visible).
 case "$key" in
   n|N|asterisk|hash) ;;
-  *) [[ -n "$sindex$spos" ]] && tmux set-option -p -t "$pane" @cmh_search_index '' \; set-option -p -t "$pane" @cmh_search_pos '' >/dev/null 2>&1 ;;
+  *) [[ -n "$sindex$spos" ]] && cmh_search_set '' '' ;;
 esac
 
 motion() {
@@ -47,20 +71,115 @@ motion() {
   fi
 }
 
+# Vertical motion keeps the cursor's column. tmux only records its goal column
+# when the cursor is not at end-of-line, so from EOL it reuses a stale column
+# and jumps to the start of the next line. Move with tmux, then put the cursor
+# back on the remembered column (clamped to the target row). The goal survives
+# consecutive j/k presses, so crossing a short line does not shrink it
+# permanently; every other key clears it in cmh_redraw.
+# Zero-width/format codepoints: bidi isolates (U+2066-2069), bidi controls
+# (U+202A-202E), LRM/RLM (U+200E-200F), joiners and invisible maths
+# (U+200B-200D, U+2060-2064), isolate end (U+206A-206F), variation selectors
+# (U+FE00-FE0F), BOM (U+FEFF) and combining diacritics (U+0300-036F). tmux
+# folds them into the previous cell: they occupy no cursor cell but still
+# appear in #{copy_cursor_line}. Counting the raw string overruns the real
+# row length and cursor-right then wraps the cursor down a row (an endless
+# up/down bounce on lines with bidi isolates, e.g. apt output). The strip
+# class is only used when the locale is multi-byte (${#sample} == 1); under
+# a C locale it would delete bytes and mangle the string. After cleaning,
+# every remaining character occupies at least one cell, so the count can
+# only undershoot the row's real length, never overshoot.
+cmh_nzw=$'\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff\ufe00\ufe01\ufe02\ufe03\ufe04\ufe05\ufe06\ufe07\ufe08\ufe09\ufe0a\ufe0b\ufe0c\ufe0d\ufe0e\ufe0f'$'\u0300\u0301\u0302\u0303\u0304\u0305\u0306\u0307\u0308\u0309\u030a\u030b\u030c\u030d\u030e\u030f\u0310\u0311\u0312\u0313\u0314\u0315\u0316\u0317\u0318\u0319\u031a\u031b\u031c\u031d\u031e\u031f\u0320\u0321\u0322\u0323\u0324\u0325\u0326\u0327\u0328\u0329\u032a\u032b\u032c\u032d\u032e\u032f\u0330\u0331\u0332\u0333\u0334\u0335\u0336\u0337\u0338\u0339\u033a\u033b\u033c\u033d\u033e\u033f\u0340\u0341\u0342\u0343\u0344\u0345\u0346\u0347\u0348\u0349\u034a\u034b\u034c\u034d\u034e\u034f\u0350\u0351\u0352\u0353\u0354\u0355\u0356\u0357\u0358\u0359\u035a\u035b\u035c\u035d\u035e\u035f\u0360\u0361\u0362\u0363\u0364\u0365\u0366\u0367\u0368\u0369\u036a\u036b\u036c\u036d\u036e\u036f'
+# ${#sample} is 1 in a UTF-8 locale (char-aware) and 3 under C (byte counts),
+# in which case the strip class would delete bytes and mangle the string.
+cmh_zw_sample=$'\u2066'
+
+# Cell length of a row string: drop zero-width codepoints, then count chars.
+cmh_row_len() {
+  local s="$1"
+  if (( ${#cmh_zw_sample} == 1 )); then
+    s="${s//[$cmh_nzw]/}"
+  fi
+  cmh_len="${#s}"
+}
+
+cmh_cursor_vertical() {
+  local dir="$1" goal col cur line out top=0 first second tcy len vout
+  local cmd=(tmux send-keys -t "$pane")
+
+  goal="${goal_opt:-$cx}"
+  col="$goal"
+
+  if [[ "$m" == "extend" ]]; then
+    cmd+=(-X "cursor-$dir")
+  else
+    cmd+=(-X clear-selection ';' send-keys -t "$pane" -X "cursor-$dir")
+  fi
+
+  # The position indicator replaces the top visible row, so toggle it while
+  # reading that row's text and keep whichever reading is unpolluted (the
+  # indicator may already have been hidden). toggle-position keeps the marks.
+  if [[ "$dir" == "up" ]] && (( cy <= 1 )); then
+    top=1
+    cmd+=(';' send-keys -t "$pane" -X toggle-position \
+          ';' display-message -p -t "$pane" 'X#{copy_cursor_x}|#{copy_cursor_y}|#{copy_cursor_line}' \
+          ';' send-keys -t "$pane" -X toggle-position \
+          ';' display-message -p -t "$pane" 'Y#{copy_cursor_line}')
+  else
+    cmd+=(';' display-message -p -t "$pane" '#{copy_cursor_x}|#{copy_cursor_y}|#{copy_cursor_line}')
+  fi
+  out="$("${cmd[@]}" 2>/dev/null)"
+
+  if (( top )); then
+    first="${out%%$'\n'*}"
+    second="${out#*$'\n'}"
+    IFS='|' read -r cur tcy line <<< "${first#X}"
+    second="${second#Y}"
+    cmh_row_len "$line"
+    local a="$cmh_len"
+    cmh_row_len "$second"
+    (( cmh_len < a )) && line="$second"
+    cmh_row_len "$line"
+  else
+    IFS='|' read -r cur tcy line <<< "$out"
+    cmh_row_len "$line"
+  fi
+  len="${cmh_len:-0}"
+  tcy="${tcy:-$cy}"
+  cur="${cur:-0}"
+  (( col > len )) && col=$len
+
+  # Column adjustment plus a position read. The step counts are in cursor
+  # steps, so on rows with wide characters the rights can still overrun the
+  # row end and wrap down; catch the drift and pull the cursor straight back
+  # with tmux's own clamping (bounded: at most one corrective, no loop).
+  if (( cur > col )); then
+    vout="$(tmux send-keys -t "$pane" -N "$(( cur - col ))" -X cursor-left \
+            ';' display-message -p -t "$pane" '#{copy_cursor_x}|#{copy_cursor_y}' 2>/dev/null)"
+  elif (( cur < col )); then
+    vout="$(tmux send-keys -t "$pane" -N "$(( col - cur ))" -X cursor-right \
+            ';' display-message -p -t "$pane" '#{copy_cursor_x}|#{copy_cursor_y}' 2>/dev/null)"
+  fi
+  if [[ -n "${vout:-}" ]]; then
+    local vcy vcx
+    IFS='|' read -r vcx vcy <<< "$vout"
+    vcy="${vcy:-$tcy}"
+    if (( vcy > tcy )); then
+      tmux send-keys -t "$pane" -N "$(( vcy - tcy ))" -X cursor-up >/dev/null 2>&1
+    elif (( vcy < tcy )); then
+      tmux send-keys -t "$pane" -N "$(( tcy - vcy ))" -X cursor-down >/dev/null 2>&1
+    fi
+  fi
+  cmh_keep_goal=1
+  cmh_goal_value="$goal"
+}
+
 clear_pending() { tmux set-option -p -t "$pane" @cmh_pending '' >/dev/null 2>&1; }
 set_pending() { tmux set-option -p -t "$pane" @cmh_pending "${1:-}" >/dev/null 2>&1; }
 begin_normal() {
   if [[ "$m" != "extend" ]]; then
     tmux send-keys -t "$pane" -X begin-selection
   fi
-}
-
-# Search result tracking: @cmh_search_index is the 1-based number of the match
-# under the cursor, @cmh_search_pos where it was counted. tmux knows only the
-# total (search_count), so search-index.sh counts the rest.
-cmh_search_set() {
-  tmux set-option -p -t "$pane" @cmh_search_index "${1:-}" \; \
-       set-option -p -t "$pane" @cmh_search_pos "${2:-}" >/dev/null 2>&1
 }
 cmh_search_begin() {
   tmux set-option -p -t "$pane" @cmh_search_pattern "${1:-}" \; \
@@ -234,8 +353,8 @@ case "$key" in
   # second keys for g/z/[/] prefixes; handled above when a prefix is pending
   c|s|u|d|p) ;;
   h|Left) motion cursor-left ;;
-  j|Down) motion cursor-down ;;
-  k|Up) motion cursor-up ;;
+  j|Down) cmh_cursor_vertical down ;;
+  k|Up) cmh_cursor_vertical up ;;
   l|Right) motion cursor-right ;;
 
   w) motion next-word ;;

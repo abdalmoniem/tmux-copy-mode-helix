@@ -15,10 +15,17 @@ pane="${1:-}"
 
 cmh_opt() { tmux show-option -pv -t "$pane" "$1" 2>/dev/null || true; }
 
-cmh_clear() {
-  tmux set-option -p -t "$pane" @cmh_search_index '' \; \
-       set-option -p -t "$pane" @cmh_search_pos '' >/dev/null 2>&1
+# Updating a pane option does not repaint copy mode; toggle-position twice
+# forces a full redraw while leaving its visibility (and the search marks)
+# unchanged.
+cmh_set() {
+  tmux set-option -p -t "$pane" @cmh_search_index "${1:-}" \; \
+       set-option -p -t "$pane" @cmh_search_pos "${2:-}" \; \
+       send-keys -t "$pane" -X toggle-position \; \
+       send-keys -t "$pane" -X toggle-position >/dev/null 2>&1
 }
+
+cmh_clear() { cmh_set '' ''; }
 
 pat="$(cmh_opt @cmh_search_pattern)"
 [ -z "$pat" ] && { cmh_clear; exit 0; }
@@ -98,8 +105,7 @@ if [[ -n "$index" ]]; then
   if [[ "${partial:-0}" != "1" && "$index" -gt "$total" ]]; then
     index="$total"
   fi
-  tmux set-option -p -t "$pane" @cmh_search_index "$index" \; \
-       set-option -p -t "$pane" @cmh_search_pos "$line,$cx" >/dev/null 2>&1
+  cmh_set "$index" "$line,$cx"
 else
   cmh_clear
 fi
