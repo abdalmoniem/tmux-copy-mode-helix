@@ -3,6 +3,7 @@
 pane="${1:-}"
 key="${2:-}"
 [ -z "$pane" ] && exit 0
+source "${0%/*}/common.sh"
 case "$key" in
   z|c) tmux send-keys -t "$pane" -X scroll-middle ;;
   t)   tmux send-keys -t "$pane" -X scroll-top ;;
@@ -11,5 +12,5 @@ case "$key" in
   k)   tmux send-keys -t "$pane" -X scroll-up ;;
   u)   tmux send-keys -t "$pane" -X halfpage-up ;;
   d)   tmux send-keys -t "$pane" -X halfpage-down ;;
-  *)   tmux display-message -t "$pane" "copy-mode-helix: unknown view key '$key'" ;;
+  *)   cmh_alert "$pane" "unknown view key '$key'" ;;
 esac

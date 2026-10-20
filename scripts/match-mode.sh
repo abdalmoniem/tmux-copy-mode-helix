@@ -3,20 +3,19 @@
 pane="${1:-}"
 key="${2:-}"
 [ -z "$pane" ] && exit 0
-DIR="${0%/*}"
 case "$key" in
   m)
-    . "$DIR/common.sh"
+    source "${0%/*}/common.sh"
     cmh_begin_if_normal "$pane"
     tmux send-keys -t "$pane" -X next-matching-bracket
     ;;
   a|i)
-    tmux display-message -t "$pane" 'copy-mode-helix: text-objects need tree-sitter (not available in tmux)'
+    cmh_alert "$pane" 'text-objects need tree-sitter (not available in tmux)'
     ;;
   s|r|d)
-    tmux display-message -t "$pane" 'copy-mode-helix: surround/edit ops are not copy-mode actions'
+    cmh_alert -t "$pane" 'surround/edit ops are not copy-mode actions'
     ;;
   *)
-    tmux display-message -t "$pane" "copy-mode-helix: unknown match key '$key'"
+    cmh_alert -t "$pane" "unknown match key '$key'"
     ;;
 esac

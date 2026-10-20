@@ -3,7 +3,7 @@
 cmd="${1:-}"
 pane="${2:-}"
 [ -z "$pane" ] && exit 0
-. "${0%/*}/common.sh"
+source "${0%/*}/common.sh"
 mode="$(cmh_mode_get "$pane")"
 if [[ "$mode" != "extend" ]]; then
   tmux send-keys -t "$pane" -X begin-selection

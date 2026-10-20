@@ -5,7 +5,9 @@ SCRIPTS="$CURRENT_DIR/scripts"
 
 # --- clipboard detection ------------------------------------------------------
 user_clip="$(tmux show-option -gv @copy-mode-helix-clipboard 2>/dev/null || true)"
-CLIP="cat > /dev/null"
+# No silent default: when neither the option nor a known tool matches, yanking
+# must fail visibly (cmh_clip_or_die in scripts/common.sh) instead of piping
+# the selection into /dev/null.
 if [[ -n "$user_clip" ]]; then
   CLIP="$user_clip"
 elif command -v wl-copy >/dev/null 2>&1; then
@@ -16,8 +18,20 @@ elif command -v xsel >/dev/null 2>&1; then
   CLIP="xsel --clipboard --input"
 elif command -v pbcopy >/dev/null 2>&1; then
   CLIP="pbcopy"
+elif command -v termux-clipboard-set >/dev/null 2>&1; then
+  CLIP="termux-clipboard-set"
 fi
 tmux set-option -g @cmh_clip "$CLIP" >/dev/null 2>&1
+
+# --- clipboard validation (load time) ----------------------------------------
+# Same contract the yanks enforce: a command that cannot run is announced here
+# and re-checked on every yank by cmh_clip_or_die, never a silent no-op.
+source "$SCRIPTS/common.sh"
+if [[ -z "$CLIP" ]]; then
+  cmh_alert "" "no clipboard command configured (set @copy-mode-helix-clipboard)"
+elif ! command -v "${CLIP%% *}" >/dev/null 2>&1; then
+  cmh_alert "" "clipboard command not found: ${CLIP%% *}"
+fi
 
 # --- base mode ---------------------------------------------------------------
 tmux set-window-option -g mode-keys vi >/dev/null 2>&1
@@ -36,7 +50,7 @@ fi
 tmux bind-key [ run-shell "$SCRIPTS/enter-copy-mode.sh '#{pane_id}'"
 
 # helper: bind a copy-mode key to the unified dispatcher
-k() {
+bind_copy_mode_key() {
   # $1 = tmux key spec, $2 = dispatcher token
   # Synchronous: stateful handlers must observe keys in the order they were
   # pressed. run-shell -b lets fast repeats race (e.g. x x, g c, x ; e).
@@ -44,52 +58,87 @@ k() {
 }
 
 # movement
-k h h; k j j; k k k; k l l
-k Left Left; k Down Down; k Up Up; k Right Right
+bind_copy_mode_key h h
+bind_copy_mode_key j j
+bind_copy_mode_key k k
+bind_copy_mode_key l l
+bind_copy_mode_key Left Left
+bind_copy_mode_key Down Down
+bind_copy_mode_key Up Up
+bind_copy_mode_key Right Right
 
 # words
-k w w; k e e; k b b
-k W W; k E E; k B B
+bind_copy_mode_key w w
+bind_copy_mode_key e e
+bind_copy_mode_key b b
+bind_copy_mode_key W W
+bind_copy_mode_key E E
+bind_copy_mode_key B B
 
 # line / buffer
-k 0 0; k Home Home
-k '^' caret
-k '$' dollar
-k End End
-k G G
-k '{' leftbrace; k '}' rightbrace
+bind_copy_mode_key 0 0
+bind_copy_mode_key Home Home
+bind_copy_mode_key '^' caret
+bind_copy_mode_key '$' dollar
+bind_copy_mode_key End End
+bind_copy_mode_key G G
+bind_copy_mode_key '{' leftbrace
+bind_copy_mode_key '}' rightbrace
 
 # paging
-k 'C-d' 'C-d'; k 'C-u' 'C-u'; k 'C-f' 'C-f'; k 'C-b' 'C-b'
-k NPage NPage; k PPage PPage
+bind_copy_mode_key 'C-d' 'C-d'
+bind_copy_mode_key 'C-u' 'C-u'
+bind_copy_mode_key 'C-f' 'C-f'
+bind_copy_mode_key 'C-b' 'C-b'
+bind_copy_mode_key NPage NPage
+bind_copy_mode_key PPage PPage
 
 # minor modes / prefixes
-k g g; k z z; k m m
-k '[' lbracket; k ']' rbracket
+bind_copy_mode_key g g
+bind_copy_mode_key z z
+bind_copy_mode_key m m
+bind_copy_mode_key '[' lbracket
+bind_copy_mode_key ']' rbracket
 
 # Prefix-only second keys. They must be bound to the dispatcher or tmux
 # handles them directly and the pending g/z/[/] prefix never sees them.
-k c c; k s s; k u u; k d d; k p p
+bind_copy_mode_key c c
+bind_copy_mode_key s s
+bind_copy_mode_key u u
+bind_copy_mode_key d d
+bind_copy_mode_key p p
 
 # selection
-k v v; k Space space
-k x x; k X X; k V V
-k '%' percent
-k o o
-k ',' comma
-k '\;' semicolon
+bind_copy_mode_key v v
+bind_copy_mode_key Space space
+bind_copy_mode_key x x
+bind_copy_mode_key X X
+bind_copy_mode_key V V
+bind_copy_mode_key '%' percent
+bind_copy_mode_key o o
+bind_copy_mode_key ',' comma
+bind_copy_mode_key '\;' semicolon
 
 # search & misc
-k n n; k N N
-k r r
-k '*' asterisk; k '#' hash
-k '/' slash; k '?' question
-k ':' colon
+bind_copy_mode_key n n
+bind_copy_mode_key N N
+bind_copy_mode_key r r
+bind_copy_mode_key '*' asterisk
+bind_copy_mode_key '#' hash
+bind_copy_mode_key '/' slash
+bind_copy_mode_key '?' question
+bind_copy_mode_key ':' colon
 
 # misc
-k y y; k Enter Enter; k Y Y
-k q q; k Escape Escape
-k ')' rightbrace
+bind_copy_mode_key y y
+bind_copy_mode_key Enter Enter
+bind_copy_mode_key Y Y
+bind_copy_mode_key q q
+bind_copy_mode_key Escape Escape
+bind_copy_mode_key ')' rightbrace
 
 # find-char keys are dispatched through keys.sh too
-k f f; k t t; k F F; k T T
+bind_copy_mode_key f f
+bind_copy_mode_key t t
+bind_copy_mode_key F F
+bind_copy_mode_key T T

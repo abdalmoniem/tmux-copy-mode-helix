@@ -86,8 +86,13 @@ motions extend the current selection. Viewport alignment (`z c`, `z z`,
 
 Options (set before `run-shell` / TPM):
 
-- `@copy-mode-helix-clipboard` – override the clipboard command used for `y`/`Enter`
-  (default: auto-detect `wl-copy`, `xclip`, `xsel`, or `pbcopy`)
+- `@copy-mode-helix-clipboard` – the clipboard command used for `y`/`Enter`/`Y`.
+  Auto-detection (`wl-copy`, `xclip`, `xsel`, `pbcopy`) only runs while it is
+  unset; there is no silent fallback command. The resolved value is validated
+  at load time and on every yank: an unknown command reports
+  `copy-mode-helix: clipboard command not found: bogus` and copies nothing.
+  Yanks use `copy-pipe -C`, so tmux's own OSC 52 clipboard write is disabled
+  and your command is the only thing that copies.
 - `@copy-mode-helix-position-indicator` – `on` (default) or `off`; controls whether
   `SEL`/`NOR` is shown in the top-right copy-mode position indicator.
 

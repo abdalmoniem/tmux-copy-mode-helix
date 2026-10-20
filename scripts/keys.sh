@@ -4,7 +4,7 @@
 key="${1:-}"
 pane="${2:-}"
 [ -z "$pane" ] && exit 0
-. "${0%/*}/common.sh"
+source "${0%/*}/common.sh"
 
 # Read pending/mode/x/search state, the vertical goal column and the cursor in
 # one tmux call. '|' preserves empty fields.
@@ -315,7 +315,7 @@ if [[ -n "$pending" ]]; then
     g-k)
       clear_pending; key=goto motion cursor-up; exit 0 ;;
     g-w)
-      clear_pending; tmux display-message -t "$pane" 'copy-mode-helix: goto-word needs tree-sitter'; exit 0 ;;
+      clear_pending; cmh_alert "$pane" 'goto-word needs tree-sitter'; exit 0 ;;
 
     z-z|z-c)
       clear_pending; tmux send-keys -t "$pane" -X scroll-middle; exit 0 ;;
@@ -334,7 +334,7 @@ if [[ -n "$pending" ]]; then
 
     m-m)
       clear_pending
-      . "${0%/*}/common.sh"
+      source "${0%/*}/common.sh"
       cmh_begin_if_normal "$pane"
       tmux send-keys -t "$pane" -X next-matching-bracket
       exit 0 ;;
@@ -463,18 +463,18 @@ case "$key" in
     tmux send-keys -t "$pane" -X history-bottom
     ;;
   y|Enter)
-    . "${0%/*}/common.sh"
-    clip="$(cmh_clip_get)"
-    tmux send-keys -t "$pane" -X copy-pipe-and-cancel "$clip"
+    source "${0%/*}/common.sh"
+    clip="$(cmh_clip_or_die "$pane")" || exit 0
+    tmux send-keys -t "$pane" -X copy-pipe-and-cancel -C "$clip"
     tmux set-option -p -t "$pane" @cmh_mode normal >/dev/null 2>&1
     ;;
   Y)
-    . "${0%/*}/common.sh"
+    source "${0%/*}/common.sh"
     tmux send-keys -t "$pane" -X start-of-line
     tmux send-keys -t "$pane" -X begin-selection
     tmux send-keys -t "$pane" -X end-of-line
-    clip="$(cmh_clip_get)"
-    tmux send-keys -t "$pane" -X copy-pipe-and-cancel "$clip"
+    clip="$(cmh_clip_or_die "$pane")" || exit 0
+    tmux send-keys -t "$pane" -X copy-pipe-and-cancel -C "$clip"
     tmux set-option -p -t "$pane" @cmh_mode normal >/dev/null 2>&1
     ;;
   asterisk|hash)
@@ -535,7 +535,7 @@ case "$key" in
     fi
     ;;
   *)
-    tmux display-message -t "$pane" "copy-mode-helix: unbound key '$key'" ;;
+    cmh_alert "$pane" "unbound key '$key'" ;;
 esac
 # clear pending if a normal command ran (prefix keys set it above)
 case "$key" in g|z|m|lbracket|rbracket) ;; *) clear_pending ;; esac
