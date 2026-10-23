@@ -27,9 +27,11 @@ Helix `g`, `m`, `z`, `[`, `]` open a one-key sub-prompt for the commands below.
 ## Keymap (copy mode)
 
 In NOR mode, plain motions move the cursor; `w e b W E B`, `f t F T`, and
-`m m` also create a selection over the range they travel. In SEL mode, cursor
-motions extend the current selection. Viewport alignment (`z c`, `z z`,
-`z t`, `z b`) leaves the cursor line and the selection in place.
+`m m` also create a selection over the range they travel. Search motions
+(`*`, `#`, `n`, `N`) never create or extend a selection in NOR mode; in SEL
+mode they extend the current selection. In SEL mode, other cursor motions
+also extend the current selection. Viewport alignment (`z c`, `z z`, `z t`,
+`z b`) leaves the cursor line and the selection in place.
 
 ### Motions
 
@@ -77,10 +79,22 @@ motions extend the current selection. Viewport alignment (`z c`, `z z`,
 | Key | Action |
 |---|---|
 | `/` `?` | search down / up (prompt) |
-| `n` `N` | next / previous search match |
+| `n` `N` | next match down / previous match up (always, regardless of search direction) |
 | `*` `#` | search current word down / up |
 | `r` | refresh from pane |
 | `:` | goto line (prompt) |
+
+`/` and `?` search with tmux regular expressions; `*` and `#` search the
+word literally. A dot is a regex wildcard, so `.sh` also matches `zsh`; use
+`\.sh` to match a literal `.sh`. Backslashes, quotes, and spaces typed at the
+prompt are preserved.
+
+The result counter follows the search direction: a forward search (`/`, `*`)
+numbers matches from the top of the buffer, while a backward search (`?`, `#`)
+numbers them from the bottom. `n` and `N` are absolute: `n` always moves to the
+next match below the cursor and `N` always moves to the previous match above
+it, even after a backward search. This differs from Helix/Vim, where `n`
+repeats the original search direction.
 
 ## Configuration
 
@@ -94,7 +108,23 @@ Options (set before `run-shell` / TPM):
   Yanks use `copy-pipe -C`, so tmux's own OSC 52 clipboard write is disabled
   and your command is the only thing that copies.
 - `@copy-mode-helix-position-indicator` – `on` (default) or `off`; controls whether
-  `SEL`/`NOR` is shown in the top-right copy-mode position indicator.
+  `SEL`/`NOR` is shown in the top-right copy-mode position indicator. The
+  indicator has the form `[match / total results] [row:col]
+  [scroll_position/history_size] [SEL|NOR]`. The match section is shown only
+  while the cursor is on a search match; `n`/`N` keep it current, while any
+  other cursor motion drops it until the next search or `n`/`N`. `row` is
+  1-based from the bottom of the buffer (the last line is 1), like
+  `scroll_position`; `col` is 1-based from the left. The match number is
+  1-based from the start of the search direction: top-down for `/` and `*`,
+  bottom-up for `?` and `#`.
+- `@copy-mode-helix-fast-keys` – `on` (default) or `off`. Read-free motions
+  (`h`/`l`, words, line/paragraph jumps, paging), the `g`/`z`/`m`/`[`/`]`
+  prefixes, and search navigation (`n`/`N`, while the recorded search index is
+  current) run as native tmux bindings with no shell fork, so held keys cannot
+  fall behind the terminal's repeat rate. A stale search index falls back to
+  the dispatcher once to recount it. Prefix chords still route through the
+  dispatcher and behave the same. Set it to `off` to bind every key to the
+  shell dispatcher again (the rollback path) and reload the plugin.
 
 ## Notes / limitations
 
