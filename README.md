@@ -28,8 +28,8 @@ Helix `g`, `m`, `z`, `[`, `]` open a one-key sub-prompt for the commands below.
 
 In NOR mode, plain motions move the cursor; `w e b W E B`, `f t F T`, and
 `m m` also create a selection over the range they travel. Search motions
-(`*`, `#`, `n`, `N`) never create or extend a selection in NOR mode; in SEL
-mode they extend the current selection. In SEL mode, other cursor motions
+(`/`, `?`, `*`, `#`, `n`, `N`) never create or extend a selection in NOR
+mode; in SEL mode they extend the current selection. In SEL mode, other cursor motions
 also extend the current selection. Viewport alignment (`z c`, `z z`, `z t`,
 `z b`) leaves the cursor line and the selection in place.
 

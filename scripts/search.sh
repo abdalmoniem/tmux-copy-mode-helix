@@ -11,6 +11,12 @@ if [[ -z "$pattern" ]]; then
   tmux set-option -pu -t "$pane" @cmh_search_input >/dev/null 2>&1
 fi
 [ -z "$pattern" ] && exit 0
+# Search is a cursor motion: in NOR mode it must not extend an existing
+# selection. SEL mode extends (the copy-mode search does that naturally).
+mode="$(tmux show-option -pv -t "$pane" @cmh_mode 2>/dev/null || true)"
+if [[ "$mode" != "extend" ]]; then
+  tmux send-keys -t "$pane" -X clear-selection
+fi
 if [[ "$direction" == "backward" ]]; then
   tmux set-option -p -t "$pane" @cmh_search_dir backward \; \
        set-option -p -t "$pane" @cmh_search_pattern "$pattern" \; \
